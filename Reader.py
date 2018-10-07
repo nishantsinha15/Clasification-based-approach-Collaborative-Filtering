@@ -1,7 +1,15 @@
 import csv
 import time
-from sklearn import svm
+from sklearn.svm import LinearSVC
 import numpy as np
+from sklearn.datasets import make_moons, make_circles, make_classification
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+
+from sklearn_extensions.extreme_learning_machines.elm import GenELMClassifier
+from sklearn_extensions.extreme_learning_machines.random_layer import RBFRandomLayer, MLPRandomLayer
+
+
 
 user_count = 943
 items_count = 1682
@@ -24,7 +32,7 @@ def read_file():
     name = 'Dataset/u.data'
     dataset = {}
     with open(name, newline='') as f:
-        reader = csv.reader(f, delimiter = '\t')
+        reader = csv.reader(f, delimiter='\t')
         for row in reader:
             userid = int(row[0])
             itemid = int(row[1])
@@ -172,12 +180,61 @@ def model(test, train):
         for j in rating_dataset[i].keys():
             test_features.append(np.concatenate((user_feature[i], item_feature[j])))
             test_ratings.append(rating_dataset[i][j])
+    # nh = [10, 50, 100, 1000]
+    # elm_accuracy = -1
+    # nh_val = 0
+    # for i in nh:
+    #     temp = eml_classifier(np.asarray(train_features), np.asarray(train_ratings), np.asarray(test_features),
+    #                           np.asarray(test_ratings))
+    #     print("Tuning ", temp, i)
+    #     if temp > elm_accuracy:
+    #         elm_accuracy = temp
+    #         nh_val = i
+    # print("Minimum ELM accuracy = ", elm_accuracy, " for c = ", nh_val)
+    # return elm_accuracy
 
-    print("Going to predict now")
-    clf = svm.SVC(gamma=0.001, C=100.)
+    c = [0.1, 0.2, 0.5, 1, 10, 100]
+    svm_accuracy = -1
+    c_val = 0
+    for i in c:
+        temp = svm_classifier(train_features, train_ratings, test_features, test_ratings, i)
+        print("Tuning ", temp, i)
+        if temp > svm_accuracy:
+            svm_accuracy = temp
+            c_val = i
+    print("Minimum SVM accuracy = ", svm_accuracy, " for c = ", c_val)
+    return svm_accuracy
+
+
+def svm_classifier(train_features, train_ratings, test_features, test_ratings, c):
+    clf = LinearSVC(C = c)
     clf.fit(train_features, train_ratings)
-    clf.predict(test_features)
-    # print( len(train_features), len(train_ratings), len(test_features), len(test_ratings) )
-    return 0
+    y = clf.predict(test_features)
+    accuracy = get_accuracy(y, test_ratings)
+    print(accuracy)
+    return accuracy
+
+
+# reference = http://wdm0006.github.io/sklearn-extensions/extreme_learning_machines.html
+def eml_classifier(train_features, train_ratings, test_features, test_ratings):
+    nh = [10, 20, 50, 100]
+    # srhl_tanh = MLPRandomLayer(n_hidden=nh, activation_func='tanh')
+    # srhl_tribas = MLPRandomLayer(n_hidden=nh, activation_func='tribas')
+    # srhl_hardlim = MLPRandomLayer(n_hidden=nh, activation_func='hardlim')
+
+    srhl_rbf = RBFRandomLayer(n_hidden=nh[0]*2, rbf_width=0.1, random_state=0)
+    clf = GenELMClassifier(hidden_layer=srhl_rbf)
+    clf.fit(train_features, train_ratings)
+    accuracy = clf.score(test_features, test_ratings)
+    print(accuracy)
+    return accuracy
+
+def get_accuracy(y, test_rating):
+    count = 0
+    for i in range(len(y)):
+        if y[i] == test_rating[i]:
+            count += 1
+    return count / len(y)
+
 
 main()
